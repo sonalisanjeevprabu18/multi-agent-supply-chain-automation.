@@ -1,0 +1,23 @@
+supplier_id,supplier_name,supplier_status,product_id,unit_price,lead_time_days,reliability_score,minimum_order_quantity
+S001,Apex Industrial Supplies,active,P001,4.2,7,0.95,50
+S002,Meridian Components,active,P001,3.95,12,0.88,25
+S003,Northline Trading,active,P001,3.78,16,0.74,25
+S004,Vertex Global Parts,active,P001,4.45,5,0.91,100
+S001,Apex Industrial Supplies,active,P002,9.8,9,0.93,40
+S002,Meridian Components,active,P002,9.02,14,0.85,20
+S004,Vertex Global Parts,active,P002,10.78,6,0.9,60
+S002,Meridian Components,active,P003,48.0,18,0.9,10
+S003,Northline Trading,active,P003,45.6,24,0.78,10
+S004,Vertex Global Parts,active,P003,53.76,11,0.89,20
+S001,Apex Industrial Supplies,active,P004,31.0,10,0.92,30
+S003,Northline Trading,active,P004,28.21,20,0.76,20
+S004,Vertex Global Parts,active,P004,33.48,8,0.9,50
+S001,Apex Industrial Supplies,active,P005,2.1,5,0.96,200
+S002,Meridian Components,active,P005,1.85,9,0.87,100
+S001,Apex Industrial Supplies,active,P006,19.14,8,0.91,25
+S002,Meridian Components,active,P006,18.4,13,0.86,15
+S004,Vertex Global Parts,active,P006,20.06,7,0.88,40
+S002,Meridian Components,active,P007,3.4,6,0.94,150
+S003,Northline Trading,active,P007,3.16,11,0.8,100
+S002,Meridian Components,active,P008,72.0,21,0.89,5
+S004,Vertex Global Parts,active,P008,82.8,14,0.87,10
