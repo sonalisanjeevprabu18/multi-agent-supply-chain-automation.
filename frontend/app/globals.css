@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --surface: 248 250 252;
+  --panel: 255 255 255;
+  --border: 226 232 240;
+  --text: 15 23 42;
+  --muted: 100 116 139;
+}
+
+.dark {
+  --surface: 2 6 23;
+  --panel: 15 23 42;
+  --border: 30 41 59;
+  --text: 226 232 240;
+  --muted: 148 163 184;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: rgb(var(--surface));
+  color: rgb(var(--text));
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+@layer components {
+  .panel {
+    @apply rounded-xl border shadow-card;
+    background-color: rgb(var(--panel));
+    border-color: rgb(var(--border));
+  }
+
+  .panel-header {
+    @apply flex items-center justify-between gap-3 border-b px-5 py-4;
+    border-color: rgb(var(--border));
+  }
+
+  .muted {
+    color: rgb(var(--muted));
+  }
+
+  .table-base {
+    @apply w-full text-left text-sm;
+  }
+
+  .table-base thead th {
+    @apply px-4 py-3 text-xs font-semibold uppercase tracking-wide;
+    color: rgb(var(--muted));
+  }
+
+  .table-base tbody td {
+    @apply px-4 py-3 align-middle;
+  }
+
+  .table-base tbody tr {
+    @apply border-t;
+    border-color: rgb(var(--border));
+  }
+
+  .table-base tbody tr:hover {
+    background-color: rgba(99, 102, 241, 0.05);
+  }
+
+  .field {
+    @apply w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2 focus:ring-brand-500/40;
+    background-color: rgb(var(--panel));
+    border-color: rgb(var(--border));
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+  }
+
+  .btn-secondary {
+    @apply btn border hover:bg-brand-50 dark:hover:bg-slate-800;
+    border-color: rgb(var(--border));
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 9999px;
+}
