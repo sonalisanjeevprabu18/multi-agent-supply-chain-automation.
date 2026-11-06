@@ -1,0 +1,24 @@
+# Local environment and tooling
+.venv/
+venv/
+node_modules/
+.git/
+.vscode/
+.idea/
+
+# Frontend is deployed as its own Vercel project (root directory: frontend/)
+frontend/
+
+# Local/dev-only data
+*.db
+*.sqlite
+*.sqlite3
+backend/artifacts/
+uploads/
+logs/
+*.log
+
+# Tests and docs are not needed inside the serverless function
+tests/
+docs/
+data/sample/*.csv

@@ -152,6 +152,7 @@ GET  /api/reports/summary     GET  /api/reports/download?report=
 
 ```bash
 source .venv/Scripts/activate
+pip install -r requirements-dev.txt   # adds pytest + httpx to the runtime set
 python -m pytest
 ```
 
