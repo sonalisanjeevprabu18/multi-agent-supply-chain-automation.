@@ -58,7 +58,7 @@ created by `tests/conftest.py`; production persistence is Postgres (see
 | Check | Command | Result |
 | --- | --- | --- |
 | TypeScript (strict, no emit) | `npx tsc --noEmit` | exit 0, no diagnostics |
-| Production build | `npm run build` | exit 0, compiled in 27.4 s, 10 static pages generated |
+| Production build | `npm run build` | exit 0, 12 static pages generated |
 | Route sizes | build output | `/` 3.52 kB · `/forecasting` 116 kB · `/inventory` 5.9 kB · `/procurement` 6.06 kB · `/disruptions` 6.09 kB · `/agents` 4.12 kB · `/reports` 5.14 kB (First Load JS 103 kB shared) |
 
 ## 4. Live API verification (local servers)
@@ -78,10 +78,14 @@ database seeded with 3 warehouses, 8 products, 5 suppliers (1 suspended),
 | Demonstration results | 1 critical alert, 767-unit replenishment, PO 767 × P001 @ ₹3,221.40, 10-day supplier delay, 767-unit W2→W1 transfer |
 | Verification | 4/5 checks passed; transfer **approved**, duplicate purchase order **rejected** ("covered by an internal transfer; defer to the next cycle") |
 | Agent logs | 15 persisted rows (7 started + 7 completed + 1 simulated), all with durations |
-| Frontend | all 7 pages returned `200`; dashboard rendered 8 products, 3 warehouses, $117,495 inventory value, 4,320 sales rows; browser console had no errors and every XHR was `200` |
+| Frontend | all 9 pages returned `200`; dashboard rendered 8 products, 3 warehouses, ₹1,17,495 inventory value, 4,320 sales rows; browser console had no errors and every XHR was `200` |
 
-Screenshots: `docs/screenshots/01-dashboard.png`, `02-agent-timeline.png`,
-`03-forecasting.png` (captured from the running app in the browser panel).
+Screenshots (redesigned SupplyFlow AI interface): `docs/screenshots/ui-01-overview.png`,
+`ui-02-forecasting.png`, `ui-03-forecasting-charts.png`, `ui-04-inventory.png`,
+`ui-05-warehouses.png`, `ui-06-procurement-drawer.png`, `ui-07-disruptions.png`,
+`ui-08-agent-timeline.png`, `ui-09-reports.png` (captured from the running app in the
+browser panel; the panel viewport is ~830 CSS px wide, so captures show the responsive
+single-column layout rather than a 1440 px desktop frame).
 
 ## 5. Checks NOT performed (honest gaps)
 

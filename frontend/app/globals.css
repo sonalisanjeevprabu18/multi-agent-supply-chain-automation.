@@ -3,19 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --surface: 248 250 252;
-  --panel: 255 255 255;
-  --border: 226 232 240;
-  --text: 15 23 42;
-  --muted: 100 116 139;
-}
-
-.dark {
-  --surface: 2 6 23;
-  --panel: 15 23 42;
-  --border: 30 41 59;
-  --text: 226 232 240;
-  --muted: 148 163 184;
+  --surface: #f5f3ec;
+  --panel: #ffffff;
+  --line: #e6e8e1;
+  --ink: #242b28;
+  --muted: #858d87;
+  --forest: #183d32;
+  --row-pad: 0.875rem;
 }
 
 html,
@@ -24,79 +18,191 @@ body {
 }
 
 body {
-  background-color: rgb(var(--surface));
-  color: rgb(var(--text));
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  background-color: var(--surface);
+  color: var(--ink);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
+}
+
+html[data-density="compact"] {
+  --row-pad: 0.5rem;
+}
+
+::selection {
+  background: #cbdDD2;
+  color: #183d32;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+    letter-spacing: -0.015em;
+  }
 }
 
 @layer components {
-  .panel {
-    @apply rounded-xl border shadow-card;
-    background-color: rgb(var(--panel));
-    border-color: rgb(var(--border));
+  .card {
+    @apply rounded-2xl border bg-white shadow-card;
+    border-color: var(--line);
   }
 
-  .panel-header {
-    @apply flex items-center justify-between gap-3 border-b px-5 py-4;
-    border-color: rgb(var(--border));
+  .card-head {
+    @apply flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4;
+    border-color: var(--line);
   }
 
-  .muted {
-    color: rgb(var(--muted));
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-stone;
   }
 
-  .table-base {
-    @apply w-full text-left text-sm;
+  .page-title {
+    @apply font-display text-[26px] font-semibold leading-tight text-forest-900;
   }
 
-  .table-base thead th {
-    @apply px-4 py-3 text-xs font-semibold uppercase tracking-wide;
-    color: rgb(var(--muted));
+  .page-subtitle {
+    @apply mt-1 max-w-2xl text-sm leading-relaxed text-stone;
   }
 
-  .table-base tbody td {
-    @apply px-4 py-3 align-middle;
-  }
-
-  .table-base tbody tr {
-    @apply border-t;
-    border-color: rgb(var(--border));
-  }
-
-  .table-base tbody tr:hover {
-    background-color: rgba(99, 102, 241, 0.05);
+  .label {
+    @apply text-[11px] font-semibold uppercase tracking-[0.1em] text-stone;
   }
 
   .field {
-    @apply w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2 focus:ring-brand-500/40;
-    background-color: rgb(var(--panel));
-    border-color: rgb(var(--border));
+    @apply w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition;
+    border-color: var(--line);
+  }
+
+  .field:hover {
+    border-color: #d5dbd0;
+  }
+
+  .field:focus {
+    border-color: #7eae8e;
+    box-shadow: 0 0 0 3px rgba(166, 199, 169, 0.35);
+  }
+
+  .field-sm {
+    @apply rounded-lg px-2.5 py-1.5 text-xs;
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition
+      disabled:cursor-not-allowed disabled:opacity-45;
   }
 
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+    @apply btn bg-forest-900 text-white hover:bg-forest-800 active:scale-[0.99];
   }
 
-  .btn-secondary {
-    @apply btn border hover:bg-brand-50 dark:hover:bg-slate-800;
-    border-color: rgb(var(--border));
+  .btn-outline {
+    @apply btn border bg-white text-ink hover:border-forest-300 hover:bg-forest-50;
+    border-color: var(--line);
+  }
+
+  .btn-ghost {
+    @apply btn text-forest-700 hover:bg-forest-50;
+  }
+
+  .btn-sm {
+    @apply rounded-lg px-3 py-1.5 text-xs;
   }
 
   .badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium capitalize;
+  }
+
+  .table {
+    @apply w-full border-collapse text-left text-sm;
+  }
+
+  .table thead th {
+    @apply whitespace-nowrap bg-[#FAF9F5] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-stone;
+  }
+
+  .table tbody td {
+    @apply px-4 align-middle;
+    padding-top: var(--row-pad);
+    padding-bottom: var(--row-pad);
+  }
+
+  .table tbody tr {
+    @apply border-t transition-colors;
+    border-color: var(--line);
+  }
+
+  .table tbody tr:hover {
+    background-color: #fbfaf6;
+  }
+
+  .table-wrap {
+    @apply -mx-5 overflow-x-auto;
+  }
+
+  .skeleton {
+    @apply rounded-lg;
+    background: linear-gradient(90deg, #f0efe8 0%, #f7f6f0 40%, #f0efe8 80%);
+    background-size: 480px 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+
+  .nav-link {
+    @apply relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium text-forest-100/75 transition;
+  }
+
+  .nav-link:hover {
+    @apply bg-white/[0.06] text-white;
+  }
+
+  .nav-link-active {
+    @apply bg-white/[0.1] text-white;
   }
 }
 
+@keyframes shimmer {
+  0% {
+    background-position: -480px 0;
+  }
+  100% {
+    background-position: 480px 0;
+  }
+}
+
+*:focus-visible {
+  outline: 2px solid #4c8763;
+  outline-offset: 2px;
+}
+
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.45);
+  background: rgba(133, 141, 135, 0.35);
   border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(133, 141, 135, 0.55);
+}
+
+.recharts-cartesian-axis-tick text {
+  fill: #858d87;
+  font-size: 11px;
+}
+
+.recharts-default-tooltip {
+  border-radius: 12px !important;
+  border: 1px solid #e6e8e1 !important;
+  box-shadow: 0 12px 28px -20px rgba(24, 61, 50, 0.5) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }

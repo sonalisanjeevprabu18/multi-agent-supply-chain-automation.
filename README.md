@@ -25,7 +25,7 @@ recovery and verification work offline.
 | Procurement & disruption | Supplier master + per-product terms, min-max weighted ranking (cost / lead time / reliability), MOQ + status constraints, purchase-order recommendations, disruption simulation (delay, unavailability, lead-time increase, reliability drop), stockout-risk projection, alternative suppliers, recovery planning |
 | Multi-agent orchestration | LangGraph `StateGraph` with 7 agents, typed shared state, conditional routing (logistics skipped when no recovery is needed), retry-once failure handling, execution + log persistence, decision verification with 6 independent checks |
 | Backend | FastAPI, Pydantic v2, SQLAlchemy 2, 14 tables, CORS, OpenAPI docs, background execution with status polling, CSV exports |
-| Frontend | Next.js App Router dashboard: executive KPIs, forecasting charts, inventory tables, supplier ranking, disruption simulator, agent timeline, reports |
+| Frontend | **SupplyFlow AI** — Next.js App Router dashboard with 9 screens: executive overview, forecasting workspace, inventory, warehouse operations, procurement (supplier drawer), disruption management, agent control center, reports with CSV export, settings. Forest-green/ivory design system, Indian Rupee + `Asia/Kolkata` formatting throughout |
 
 ## 2. Architecture
 

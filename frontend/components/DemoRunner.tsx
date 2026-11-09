@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Play, ReceiptText } from "lucide-react";
+import { Loader2, Play, ReceiptText } from "lucide-react";
 import { ApiError, apiPost } from "@/lib/api";
 import type { AgentExecution } from "@/types";
 import { Toast } from "@/components/ui";
@@ -19,9 +19,7 @@ export function DemoRunner({
   onFinished?: (execution: AgentExecution) => void;
 }) {
   const [running, setRunning] = useState(false);
-  const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(
-    null,
-  );
+  const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
   const [executionId, setExecutionId] = useState<string | null>(null);
 
   async function run() {
@@ -35,7 +33,7 @@ export function DemoRunner({
       setToast({
         message:
           execution.status === "completed"
-            ? `Scenario complete: ${execution.summary?.transfers ?? 0} transfer(s), ${
+            ? `Scenario complete · ${execution.summary?.transfers ?? 0} transfer(s), ${
                 execution.summary?.purchase_orders ?? 0
               } purchase order(s), ${execution.summary?.active_disruptions ?? 0} disruption(s).`
             : `Execution finished with status ${execution.status}.`,
@@ -53,14 +51,18 @@ export function DemoRunner({
   }
 
   return (
-    <div className={compact ? "flex items-center gap-2" : "flex flex-wrap items-center gap-3"}>
+    <div className={compact ? "flex items-center gap-2" : "flex flex-wrap items-center gap-2"}>
       <button type="button" className="btn-primary" onClick={run} disabled={running}>
-        <Play className="h-4 w-4" />
+        {running ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Play className="h-4 w-4" />
+        )}
         {running ? "Running 7 agents…" : "Run demonstration scenario"}
       </button>
       {executionId ? (
-        <Link href="/agents" className="btn-secondary">
-          <ReceiptText className="h-4 w-4" /> View execution timeline
+        <Link href={`/agents?execution=${executionId}`} className="btn-outline">
+          <ReceiptText className="h-4 w-4" /> View timeline
         </Link>
       ) : null}
       {toast ? (

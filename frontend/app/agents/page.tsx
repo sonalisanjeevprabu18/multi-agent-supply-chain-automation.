@@ -3,38 +3,72 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
+  ChevronDown,
   CircleDashed,
+  Clock3,
   Loader2,
   PlayCircle,
   ShieldCheck,
+  ShieldX,
   XCircle,
 } from "lucide-react";
 import {
   Badge,
   Card,
-  EmptyState,
-  ErrorState,
-  LoadingState,
+  EmptyPanel,
+  ErrorPanel,
+  Field,
+  KpiCard,
+  LoadingPanel,
   PageHeader,
+  Progress,
+  StatRow,
+  TableWrap,
   Toast,
 } from "@/components/ui";
-import { DemoRunner } from "@/components/DemoRunner";
 import { ApiError, WORKFLOW_SYNC, apiGet, apiPost } from "@/lib/api";
 import { useApi } from "@/lib/useApi";
-import { dateTime, num, timeAgo } from "@/lib/format";
-import type { AgentExecution } from "@/types";
+import { dateTime, duration, num, timeAgo } from "@/lib/format";
+import type { AgentExecution, AgentLog } from "@/types";
 
 const AGENTS = [
-  { key: "demand_forecasting_agent", label: "Demand Forecasting" },
-  { key: "inventory_monitoring_agent", label: "Inventory Monitoring" },
-  { key: "inventory_optimization_agent", label: "Inventory Optimization" },
-  { key: "procurement_agent", label: "Procurement" },
-  { key: "supplier_disruption_agent", label: "Supplier Disruption" },
-  { key: "logistics_agent", label: "Logistics" },
-  { key: "decision_verification_agent", label: "Decision Verification" },
+  { key: "demand_forecasting_agent", label: "Demand Forecasting Agent" },
+  { key: "inventory_monitoring_agent", label: "Inventory Monitoring Agent" },
+  { key: "inventory_optimization_agent", label: "Inventory Optimization Agent" },
+  { key: "procurement_agent", label: "Procurement Agent" },
+  { key: "supplier_disruption_agent", label: "Supplier Disruption Agent" },
+  { key: "logistics_agent", label: "Logistics Agent" },
+  { key: "decision_verification_agent", label: "Decision Verification Agent" },
 ];
 
-export default function AgentsPage() {
+type ExecutionRow = {
+  execution_id: string;
+  status: string;
+  scenario: string;
+  started_at: string | null;
+  finished_at: string | null;
+  summary: Record<string, unknown> | null;
+};
+
+function outputSummary(log: AgentLog | undefined): string | null {
+  if (!log?.payload) return null;
+  const parts: string[] = [];
+  Object.entries(log.payload).forEach(([key, value]) => {
+    if (value && typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      if (typeof record.count === "number") {
+        parts.push(`${record.count} ${key.replace(/_/g, " ")}`);
+      } else if (Array.isArray(record.checks)) {
+        parts.push(`${record.checks.length} verification checks`);
+      }
+    } else if (typeof value === "number" || typeof value === "string") {
+      parts.push(`${key.replace(/_/g, " ")}: ${value}`);
+    }
+  });
+  return parts.length ? parts.join(" · ") : null;
+}
+
+export default function AgentControlCenterPage() {
   const [executionId, setExecutionId] = useState<string | null>(null);
   const [execution, setExecution] = useState<AgentExecution | null>(null);
   const [scenario, setScenario] = useState("disruption_demo");
@@ -42,9 +76,10 @@ export default function AgentsPage() {
   const [serviceLevel, setServiceLevel] = useState(0.95);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
 
-  const history = useApi<Array<Record<string, unknown>>>("/api/agents/executions?limit=15");
+  const history = useApi<ExecutionRow[]>("/api/agents/executions?limit=15");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -59,9 +94,7 @@ export default function AgentsPage() {
       if (!quiet) setError(null);
       return response;
     } catch (err) {
-      if (!quiet) {
-        setError(err instanceof ApiError ? err.message : "Could not load that execution.");
-      }
+      if (!quiet) setError(err instanceof ApiError ? err.message : "Could not load that execution.");
       return null;
     }
   }, []);
@@ -70,7 +103,6 @@ export default function AgentsPage() {
     if (!executionId) return;
     let cancelled = false;
     loadExecution(executionId);
-
     const interval = setInterval(async () => {
       if (cancelled) return;
       const latest = await loadExecution(executionId, true);
@@ -79,7 +111,6 @@ export default function AgentsPage() {
         history.reload?.();
       }
     }, 1500);
-
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -103,7 +134,7 @@ export default function AgentsPage() {
       setToast({
         message:
           response.status === "completed"
-            ? "Workflow completed."
+            ? "Workflow completed — every agent wrote a persisted log row."
             : "Workflow dispatched — polling for live progress.",
         tone: "success",
       });
@@ -115,7 +146,7 @@ export default function AgentsPage() {
   }
 
   const logsByAgent = useMemo(() => {
-    const map = new Map<string, AgentExecution["logs"]>();
+    const map = new Map<string, AgentLog[]>();
     for (const log of execution?.logs ?? []) {
       const list = map.get(log.agent_name) ?? [];
       list.push(log);
@@ -124,305 +155,481 @@ export default function AgentsPage() {
     return map;
   }, [execution]);
 
-  const completed = new Set(
-    (execution?.logs ?? []).filter((log) => log.status === "completed").map((log) => log.agent_name),
+  const completedAgents = new Set(
+    (execution?.logs ?? [])
+      .filter((log) => log.status === "completed")
+      .map((log) => log.agent_name),
   );
-  const activeAgent = AGENTS.find(
-    (agent) => !completed.has(agent.key) && logsByAgent.has(agent.key),
+
+  const runningAgent = AGENTS.find(
+    (agent) => !completedAgents.has(agent.key) && logsByAgent.has(agent.key),
   )?.key;
+
+  const verification = execution?.summary?.verification ?? null;
+  const requiresReview =
+    execution?.status === "completed" && verification !== null && verification.approved === false;
+
+  const currentAgentLabel = execution?.current_agent
+    ? (AGENTS.find((agent) => agent.key === execution.current_agent)?.label ??
+      execution.current_agent)
+    : null;
+
+  const totalDuration = (execution?.logs ?? []).reduce((sum, log) => sum + log.duration_ms, 0);
+  const failedLogs = (execution?.logs ?? []).filter((log) => log.status === "failed").length;
 
   return (
     <>
       <PageHeader
-        title="Multi-agent monitoring"
-        subtitle="LangGraph executes seven specialized agents over one shared state. Every step writes an agent_logs row; verification re-derives the constraints before any recommendation is approved."
-        actions={<DemoRunner compact />}
+        title="AI Agent Control Center"
+        subtitle="LangGraph executes seven specialised agents over one shared state. Every step writes an agent_logs row; the verification agent re-derives each constraint before anything is approved."
+        actions={
+          <button className="btn-primary" onClick={execute} disabled={busy}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
+            {busy ? "Executing workflow…" : "Execute Workflow"}
+          </button>
+        }
       />
 
-      <div className="grid gap-6 xl:grid-cols-4">
-        <Card title="Execute workflow" description="Persisted execution + polling">
-          <label className="mb-3 block text-xs font-semibold uppercase tracking-wide muted">
-            Scenario
-            <select
-              className="field mt-1 font-normal normal-case"
-              value={scenario}
-              onChange={(event) => setScenario(event.target.value)}
-            >
-              <option value="disruption_demo">disruption_demo</option>
-              <option value="standard_workflow">standard_workflow</option>
-            </select>
-          </label>
-          <div className="mb-3 grid grid-cols-2 gap-3">
-            <label className="block text-xs font-semibold uppercase tracking-wide muted">
-              Horizon
-              <select
-                className="field mt-1 font-normal"
-                value={horizon}
-                onChange={(event) => setHorizon(Number(event.target.value))}
-              >
-                {[7, 14, 30].map((value) => (
-                  <option key={value} value={value}>
-                    {value}d
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-xs font-semibold uppercase tracking-wide muted">
-              Service level
-              <select
-                className="field mt-1 font-normal"
-                value={serviceLevel}
-                onChange={(event) => setServiceLevel(Number(event.target.value))}
-              >
-                {[0.9, 0.95, 0.98].map((value) => (
-                  <option key={value} value={value}>
-                    {(value * 100).toFixed(0)}%
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <button className="btn-primary w-full" onClick={execute} disabled={busy}>
-            <PlayCircle className="h-4 w-4" />
-            {busy ? "Starting…" : "Execute agents"}
-          </button>
-          <p className="mt-3 text-xs muted">
-            Mode: {WORKFLOW_SYNC ? "synchronous (serverless-safe)" : "background polling"}
+      {requiresReview ? (
+        <div className="mb-5 flex items-start gap-3 rounded-xl border border-[#EEDDBB] bg-[#FBF6EA] px-4 py-3 text-[13px] text-[#8A5F1B]">
+          <ShieldX className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            Verification rejected at least one decision — this execution is marked{" "}
+            <strong>requires review</strong>. Inspect the failed checks below before acting on the
+            recommendations.
           </p>
-        </Card>
+        </div>
+      ) : null}
 
-        <Card title="Execution history" description="Latest 15 runs" className="xl:col-span-3">
-          {history.loading && !history.data ? <LoadingState /> : null}
-          {history.error ? <ErrorState message={history.error} /> : null}
-          {history.data && history.data.length === 0 ? (
-            <EmptyState message="No executions yet — run the workflow or the demo scenario." />
-          ) : null}
-          {history.data?.length ? (
-            <div className="-mx-5 max-h-56 overflow-y-auto">
-              <table className="table-base">
-                <thead>
-                  <tr>
-                    <th>Execution</th>
-                    <th>Scenario</th>
-                    <th>Status</th>
-                    <th>Started</th>
-                    <th className="text-right">Transfers</th>
-                    <th className="text-right">Orders</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.data.map((row) => {
-                    const id = String(row.execution_id);
-                    const summary = (row.summary || {}) as Record<string, unknown>;
-                    return (
-                      <tr key={id} className={executionId === id ? "bg-brand-50/50 dark:bg-brand-500/5" : ""}>
-                        <td className="font-mono text-xs">{id.slice(0, 8)}…</td>
-                        <td className="text-xs">{String(row.scenario)}</td>
-                        <td>
-                          <Badge value={String(row.status)} />
-                        </td>
-                        <td className="text-xs muted">{timeAgo(row.started_at as string)}</td>
-                        <td className="text-right tabular-nums">{num(Number(summary.transfers ?? 0))}</td>
-                        <td className="text-right tabular-nums">
-                          {num(Number(summary.purchase_orders ?? 0))}
-                        </td>
-                        <td className="text-right">
-                          <button
-                            className="text-xs font-semibold text-brand-600"
-                            onClick={() => setExecutionId(id)}
-                          >
-                            inspect
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          label="Executions"
+          value={num(history.data?.length ?? 0)}
+          hint="Latest 15 recorded runs"
+          icon={<PlayCircle className="h-4 w-4" />}
+        />
+        <KpiCard
+          label="Selected status"
+          value={execution ? execution.status.replace(/_/g, " ") : "—"}
+          hint={execution ? `${execution.progress}% of the graph traversed` : "No run selected"}
+          tone={
+            execution?.status === "failed"
+              ? "danger"
+              : requiresReview
+                ? "warning"
+                : execution
+                  ? "success"
+                  : "neutral"
+          }
+        />
+        <KpiCard
+          label="Agents completed"
+          value={
+            execution
+              ? `${num(completedAgents.size)} / ${AGENTS.length}`
+              : `0 / ${AGENTS.length}`
+          }
+          hint={`${num(failedLogs)} failed step(s)`}
+        />
+        <KpiCard
+          label="Logged agent time"
+          value={totalDuration ? duration(totalDuration) : "—"}
+          hint="Sum of persisted step durations"
+          icon={<Clock3 className="h-4 w-4" />}
+        />
       </div>
 
-      {error ? <div className="mt-6"><ErrorState message={error} /></div> : null}
-
-      {execution ? (
-        <div className="mt-6 space-y-6">
-          <Card
-            title={`Execution ${execution.execution_id.slice(0, 8)}…`}
-            description={`${execution.scenario} · started ${dateTime(execution.started_at)}`}
-            actions={
-              <div className="flex items-center gap-2">
-                <Badge value={execution.status} />
-                <span className="text-xs muted">{execution.progress}%</span>
-              </div>
-            }
-          >
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  execution.status === "failed" ? "bg-rose-500" : "bg-brand-600"
-                }`}
-                style={{ width: `${execution.progress}%` }}
-              />
-            </div>
-            {execution.error ? (
-              <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
-                {execution.error}
+      <div className="mt-6 grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="space-y-6">
+          <Card title="Workflow parameters" description="Applied to the next execution">
+            <div className="space-y-4">
+              <Field label="Scenario">
+                <select className="field" value={scenario} onChange={(event) => setScenario(event.target.value)}>
+                  <option value="disruption_demo">Disruption demo</option>
+                  <option value="standard_workflow">Standard workflow</option>
+                </select>
+              </Field>
+              <Field label="Forecast horizon">
+                <select
+                  className="field"
+                  value={horizon}
+                  onChange={(event) => setHorizon(Number(event.target.value))}
+                >
+                  {[7, 14, 30].map((value) => (
+                    <option key={value} value={value}>
+                      {value} days
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Service level">
+                <select
+                  className="field"
+                  value={serviceLevel}
+                  onChange={(event) => setServiceLevel(Number(event.target.value))}
+                >
+                  {[0.9, 0.95, 0.98].map((value) => (
+                    <option key={value} value={value}>
+                      {(value * 100).toFixed(0)}%
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <p className="rounded-lg bg-[#FBFAF6] px-3 py-2 text-[11px] leading-relaxed text-stone">
+                Mode: {WORKFLOW_SYNC ? "synchronous (serverless-safe)" : "background polling"}.
+                Records come from the database, never from a UI animation.
               </p>
-            ) : null}
-
-            <ol className="mt-5 space-y-3">
-              {AGENTS.map((agent, index) => {
-                const logs = logsByAgent.get(agent.key) ?? [];
-                const done = completed.has(agent.key);
-                const failed = logs.some((log) => log.status === "failed");
-                const running = activeAgent === agent.key && !done && !failed;
-                const last = logs[logs.length - 1];
-                if (logs.length === 0 && !done) {
-                  return (
-                    <li key={agent.key} className="flex items-start gap-3 opacity-50">
-                      <CircleDashed className="mt-0.5 h-4 w-4" />
-                      <div>
-                        <p className="text-sm font-medium">
-                          {index + 1}. {agent.label}
-                        </p>
-                        <p className="text-xs muted">Not executed</p>
-                      </div>
-                    </li>
-                  );
-                }
-                return (
-                  <li key={agent.key} className="flex items-start gap-3">
-                    {failed ? (
-                      <XCircle className="mt-0.5 h-4 w-4 text-rose-500" />
-                    ) : running ? (
-                      <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-brand-500" />
-                    ) : (
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-500" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-medium">
-                          {index + 1}. {agent.label}
-                        </p>
-                        {last ? <Badge value={last.status} /> : null}
-                        {last ? (
-                          <span className="text-xs muted">{last.duration_ms} ms</span>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 text-xs muted">{last?.message}</p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
+            </div>
           </Card>
 
-          {execution.summary?.verification ? (
-            <div className="grid gap-6 xl:grid-cols-2">
-              <Card title="Verification checks" description="Independent re-derivation of every constraint">
-                <div className="flex items-center gap-2">
-                  {execution.summary.verification.approved ? (
-                    <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                  ) : (
-                    <XCircle className="h-4 w-4 text-rose-500" />
-                  )}
-                  <p className="text-sm font-medium">
-                    {execution.summary.verification.approved ? "Approved" : "Rejected"}
-                  </p>
+          <Card title="Execution history" description="Latest 15 runs" bodyClassName="p-0">
+            {history.loading && !history.data ? (
+              <div className="p-5">
+                <LoadingPanel rows={4} />
+              </div>
+            ) : null}
+            {history.error ? (
+              <div className="p-5">
+                <ErrorPanel message={history.error} />
+              </div>
+            ) : null}
+            {history.data && history.data.length === 0 ? (
+              <div className="p-5">
+                <EmptyPanel message="No executions yet. Run the workflow to record one." />
+              </div>
+            ) : null}
+            <div className="max-h-[420px] overflow-y-auto">
+              {history.data?.map((row) => (
+                <button
+                  key={row.execution_id}
+                  type="button"
+                  onClick={() => setExecutionId(row.execution_id)}
+                  className={`flex w-full items-center gap-3 border-b border-line px-5 py-3 text-left transition last:border-0 hover:bg-forest-50/60 ${
+                    executionId === row.execution_id ? "bg-forest-50" : ""
+                  }`}
+                >
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+                      row.status === "completed"
+                        ? "bg-[#EDF4EF] text-[#2F6B4A]"
+                        : row.status === "failed"
+                          ? "bg-[#FBEDEC] text-[#A9443E]"
+                          : "bg-[#FBF3E4] text-[#94651F]"
+                    }`}
+                  >
+                    {row.status === "completed" ? (
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    ) : (
+                      <XCircle className="h-3.5 w-3.5" />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-mono text-[12px] text-ink">
+                      {row.execution_id.slice(0, 8)}
+                    </span>
+                    <span className="block text-[11px] text-stone">
+                      {row.scenario.replace(/_/g, " ")} · {timeAgo(row.started_at)}
+                    </span>
+                  </span>
+                  <span className="text-[11px] text-stone">
+                    {num(Number(row.summary?.purchase_orders ?? 0))} PO
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          {error ? <ErrorPanel message={error} /> : null}
+          {!execution ? (
+            <Card title="Execution timeline" description="Select a run or execute the workflow">
+              <EmptyPanel message="No execution selected. Every node below is populated from agent_logs rows, including durations and decision explanations." />
+            </Card>
+          ) : (
+            <>
+              <Card
+                title="Execution timeline"
+                description={`${execution.scenario.replace(/_/g, " ")} · started ${dateTime(
+                  execution.started_at,
+                )} · ${execution.execution_id.slice(0, 8)}`}
+                actions={<Badge value={requiresReview ? "requires review" : execution.status} />}
+                bodyClassName="p-0"
+              >
+                <div className="border-b border-line px-5 py-4">
+                  <div className="mb-2 flex items-center justify-between text-[11px] text-stone">
+                    <span>{currentAgentLabel ?? "Workflow idle"}</span>
+                    <span>{execution.progress}%</span>
+                  </div>
+                  <Progress
+                    value={execution.progress}
+                    tone={execution.status === "failed" ? "danger" : "forest"}
+                  />
+                  {execution.error ? (
+                    <p className="mt-3 rounded-lg border border-[#F0D8D6] bg-[#FCF3F2] px-3 py-2 text-[11px] leading-relaxed text-[#93433E]">
+                      {execution.error}
+                    </p>
+                  ) : null}
                 </div>
-                <ul className="mt-4 space-y-3">
-                  {execution.summary.verification.checks.map((check) => (
-                    <li key={check.check} className="rounded-lg border px-3 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium">{check.check.replace(/_/g, " ")}</span>
-                        <Badge value={check.passed ? "passed" : "failed"} kind="plain" />
-                      </div>
-                      <p className="mt-1 text-xs muted">{check.detail}</p>
-                    </li>
-                  ))}
-                </ul>
+
+                <ol className="relative px-5 py-4">
+                  <span className="absolute bottom-8 left-[35px] top-8 w-px bg-line" aria-hidden />
+                  {AGENTS.map((agent, index) => {
+                    const logs = logsByAgent.get(agent.key) ?? [];
+                    const last = logs[logs.length - 1];
+                    const done = completedAgents.has(agent.key);
+                    const failed = logs.some((log) => log.status === "failed");
+                    const running = runningAgent === agent.key && !done && !failed;
+                    const isVerification = agent.key === "decision_verification_agent";
+                    const pendingReview = isVerification && requiresReview;
+                    const status = failed
+                      ? "failed"
+                      : pendingReview
+                        ? "requires review"
+                        : done
+                          ? "completed"
+                          : running
+                            ? "running"
+                            : "pending";
+                    const open = expanded === agent.key;
+                    const summary = outputSummary(last);
+
+                    return (
+                      <li key={agent.key} className="relative flex gap-4 pb-5 last:pb-0">
+                        <span
+                          className={`relative z-10 flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border-2 bg-white ${
+                            failed
+                              ? "border-[#C65B55] text-[#A9443E]"
+                              : pendingReview
+                                ? "border-[#D89A39] text-[#94651F]"
+                                : done
+                                  ? "border-[#4C8763] text-[#2F6B4A]"
+                                  : running
+                                    ? "border-[#8FA9B8] text-[#41637A]"
+                                    : "border-line text-stone"
+                          }`}
+                        >
+                          {failed ? (
+                            <XCircle className="h-3.5 w-3.5" />
+                          ) : pendingReview ? (
+                            <ShieldX className="h-3.5 w-3.5" />
+                          ) : done ? (
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          ) : running ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <CircleDashed className="h-3.5 w-3.5" />
+                          )}
+                        </span>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-[13px] font-medium text-ink">
+                              {index + 1}. {agent.label}
+                            </p>
+                            <Badge value={status} />
+                            {last ? (
+                              <span className="text-[11px] tabular-nums text-stone">
+                                {duration(last.duration_ms)}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {last ? (
+                            <div className="mt-1.5 space-y-1 text-[12px] leading-relaxed">
+                              <p className="text-stone">
+                                <span className="font-medium text-forest-700">Input </span>
+                                {index === 0
+                                  ? `Scenario ${execution.scenario.replace(/_/g, " ")}, ${
+                                      execution.horizon_days ?? horizon
+                                    }-day horizon`
+                                  : `Shared state from ${AGENTS[index - 1].label}`}
+                              </p>
+                              <p className="text-ink">{last.message}</p>
+                              {summary ? (
+                                <p className="text-stone">
+                                  <span className="font-medium text-forest-700">Output </span>
+                                  {summary}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <p className="mt-1 text-[12px] text-stone">Not executed in this run.</p>
+                          )}
+
+                          {last ? (
+                            <button
+                              type="button"
+                              onClick={() => setExpanded(open ? null : agent.key)}
+                              className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-forest-600 hover:text-forest-800"
+                            >
+                              {open ? "Hide decision record" : "Decision record"}
+                              <ChevronDown
+                                className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
+                              />
+                            </button>
+                          ) : null}
+
+                          {open && last ? (
+                            <div className="mt-2 space-y-2">
+                              <dl className="rounded-lg bg-[#FBFAF6] px-3 py-2">
+                                <StatRow label="Status" value={last.status} />
+                                <StatRow label="Step index" value={String(last.step_index)} />
+                                <StatRow label="Duration" value={duration(last.duration_ms)} />
+                                <StatRow label="Logged at" value={dateTime(last.created_at)} />
+                              </dl>
+                              <pre className="max-h-56 overflow-auto rounded-lg border border-line bg-white p-3 text-[10.5px] leading-relaxed text-[#3A423D]">
+                                {JSON.stringify(last.payload ?? { message: last.message }, null, 2)}
+                              </pre>
+                            </div>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
               </Card>
 
-              <Card title="Decisions" description="Approved and rejected recommendations">
-                {execution.summary.decisions?.length ? (
-                  <div className="-mx-5 overflow-x-auto">
-                    <table className="table-base">
+              {verification ? (
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <Card
+                    title="Verification checks"
+                    description="Independent re-derivation of every constraint"
+                    actions={
+                      <span
+                        className={`flex items-center gap-1.5 text-[11px] font-medium ${
+                          verification.approved ? "text-[#2F6B4A]" : "text-[#A9443E]"
+                        }`}
+                      >
+                        {verification.approved ? (
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                        ) : (
+                          <ShieldX className="h-3.5 w-3.5" />
+                        )}
+                        {verification.approved ? "Approved" : "Rejected"}
+                      </span>
+                    }
+                  >
+                    <ul className="space-y-2.5">
+                      {verification.checks.map((check) => (
+                        <li
+                          key={check.check}
+                          className="rounded-xl border border-line px-3.5 py-2.5"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[13px] font-medium capitalize text-ink">
+                              {check.check.replace(/_/g, " ")}
+                            </span>
+                            <Badge value={check.passed ? "passed" : "failed"} />
+                          </div>
+                          <p className="mt-1 text-[11px] leading-relaxed text-stone">{check.detail}</p>
+                        </li>
+                      ))}
+                    </ul>
+                    {verification.summary ? (
+                      <p className="mt-3 text-[11px] leading-relaxed text-stone">
+                        {verification.summary}
+                      </p>
+                    ) : null}
+                  </Card>
+
+                  <Card
+                    title="Decisions"
+                    description="Approved and rejected recommendations"
+                    bodyClassName="pb-2"
+                  >
+                    {execution.summary?.decisions?.length ? (
+                      <TableWrap>
+                        <table className="table">
+                          <thead>
+                            <tr>
+                              <th>Action</th>
+                              <th>SKU</th>
+                              <th className="text-right">Qty</th>
+                              <th>Outcome</th>
+                              <th>Reason</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {execution.summary.decisions.map((decision, index) => (
+                              <tr key={`${decision.action}-${index}`}>
+                                <td className="text-[12px] capitalize">
+                                  {decision.action.replace(/_/g, " ")}
+                                </td>
+                                <td className="font-medium">{decision.sku}</td>
+                                <td className="text-right tabular-nums">{num(decision.quantity)}</td>
+                                <td>
+                                  <Badge value={decision.approved ? "approved" : "rejected"} />
+                                </td>
+                                <td className="max-w-[220px] text-[11px] text-stone">
+                                  {decision.reason}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </TableWrap>
+                    ) : (
+                      <EmptyPanel message="No decisions were produced by this run." />
+                    )}
+                    {execution.summary?.recommended_actions?.length ? (
+                      <div className="mx-5 mb-3 rounded-lg bg-forest-50 px-3 py-2">
+                        <p className="text-[11px] font-semibold text-forest-800">Approved actions</p>
+                        <p className="mt-0.5 text-[11px] leading-relaxed text-stone">
+                          {execution.summary.recommended_actions.join(" · ")}
+                        </p>
+                      </div>
+                    ) : null}
+                  </Card>
+                </div>
+              ) : null}
+
+              <Card
+                title="Raw agent log"
+                description="Every persisted step, oldest first"
+                bodyClassName="pb-2"
+              >
+                {execution.logs.length ? (
+                  <TableWrap>
+                    <table className="table">
                       <thead>
                         <tr>
-                          <th>Action</th>
-                          <th>SKU</th>
-                          <th className="text-right">Qty</th>
-                          <th>Approved</th>
-                          <th>Reason</th>
+                          <th>Step</th>
+                          <th>Agent</th>
+                          <th>Status</th>
+                          <th>Message</th>
+                          <th className="text-right">Duration</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {execution.summary.decisions.map((decision, index) => (
-                          <tr key={`${decision.action}-${index}`}>
-                            <td className="text-xs">{decision.action.replace(/_/g, " ")}</td>
-                            <td className="font-medium">{decision.sku}</td>
-                            <td className="text-right tabular-nums">{num(decision.quantity)}</td>
+                        {execution.logs.map((log) => (
+                          <tr key={log.id}>
+                            <td className="tabular-nums text-[12px] text-stone">{log.step_index}</td>
+                            <td className="text-[12px] font-medium">{log.agent_name}</td>
                             <td>
-                              <Badge value={decision.approved ? "approved" : "rejected"} kind="plain" />
+                              <Badge value={log.status} />
                             </td>
-                            <td className="text-xs muted">{decision.reason}</td>
+                            <td className="max-w-[520px] text-[11px] leading-relaxed text-stone">
+                              {log.message}
+                            </td>
+                            <td className="text-right text-[12px] tabular-nums">
+                              {duration(log.duration_ms)}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </TableWrap>
                 ) : (
-                  <EmptyState message="No decisions were produced." />
-                )}
-                {execution.summary.recommended_actions?.length ? (
-                  <div className="mt-4 rounded-lg border border-brand-200 bg-brand-50/60 p-3 text-xs dark:border-brand-500/30 dark:bg-brand-500/10">
-                    <p className="font-semibold">Approved actions</p>
-                    <p className="mt-1 muted">
-                      {execution.summary.recommended_actions.join(" · ")}
-                    </p>
+                  <div className="p-5">
+                    <EmptyPanel message="No log entries yet." />
                   </div>
-                ) : null}
+                )}
               </Card>
-            </div>
-          ) : null}
-
-          <Card title="Raw agent log" description="Every persisted step, newest last">
-            {execution.logs.length ? (
-              <div className="-mx-5 max-h-96 overflow-y-auto">
-                <table className="table-base">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Agent</th>
-                      <th>Status</th>
-                      <th>Message</th>
-                      <th className="text-right">Duration</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {execution.logs.map((log) => (
-                      <tr key={log.id}>
-                        <td className="tabular-nums text-xs">{log.step_index}</td>
-                        <td className="text-xs font-medium">{log.agent_name}</td>
-                        <td>
-                          <Badge value={log.status} />
-                        </td>
-                        <td className="text-xs muted">{log.message}</td>
-                        <td className="text-right text-xs tabular-nums">{log.duration_ms} ms</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <EmptyState message="No log entries yet." />
-            )}
-          </Card>
+            </>
+          )}
         </div>
-      ) : null}
+      </div>
 
       {toast ? <Toast message={toast.message} tone={toast.tone} onClose={() => setToast(null)} /> : null}
     </>

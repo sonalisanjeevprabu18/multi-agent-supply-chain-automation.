@@ -34,7 +34,9 @@
 
 ```
 supply-chain-ai/
-├── frontend/                 Next.js dashboard (7 pages)
+├── frontend/                 Next.js dashboard (9 routes: overview, forecasting,
+│                             inventory, warehouses, procurement, disruptions,
+│                             agents, reports, settings)
 ├── backend/
 │   ├── main.py               FastAPI app, CORS, lifespan, /health
 │   ├── api/                  routers per domain
