@@ -93,7 +93,7 @@ single-column layout rather than a 1440 px desktop frame).
 | --- | --- |
 | Supabase/Postgres integration test | **not run** — no Supabase project credentials in this environment; SQLAlchemy is dialect-agnostic and the schema is created from the same models, but this remains unverified against a real Postgres instance |
 | Vercel deployment / production URLs | **not run** — no Vercel credentials; `vercel.json` + `api/index.py` are in place and the ASGI app is tested locally |
-| GitHub push | **not run** — no GitHub authentication available in this environment |
+| GitHub push | **done** — the full history is on `origin/main` at `github.com/sonalisanjeevprabu18/multi-agent-supply-chain-automation.` |
 | Load/performance testing | not run; demo workflow completes in ~1.6 s on 4,320 sales rows |
 | Cross-browser testing | Chromium only |
 | Accessibility audit | not run (semantic tables, labels and focusable controls are used) |
