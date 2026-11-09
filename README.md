@@ -6,10 +6,6 @@ multi-warehouse inventory, size replenishment, rank suppliers, detect supply
 disruptions, plan warehouse transfers and verify every decision before it is
 recorded.
 
-**All core decisions are deterministic Python business logic. No LLM API is
-required or called.** Forecasting, optimization, supplier ranking, disruption
-recovery and verification work offline.
-
 > Purchase orders and supplier disruptions are **simulated planning records**.
 > Seeded data is **synthetic demonstration data** — never presented as real
 > business records.
@@ -201,10 +197,3 @@ commit `.env` files or the Supabase service-role key to Git.
 | 3 | Procurement & disruption management | `procurement/`, `backend/services/procurement_service.py` |
 | 4 | Orchestration, backend & integration | `agents/`, `backend/api/`, `backend/main.py`, `frontend/` |
 
-## 11. Research context
-
-This capstone implements the multi-agent business-process-automation pattern
-described in the accompanying literature (agent specialization, shared state,
-orchestration, verification). Unlike LLM-only agent designs, every decision here is
-reproducible and auditable: the same inputs produce the same recommendations, and
-verification re-derives the constraints instead of trusting the proposing agent.
